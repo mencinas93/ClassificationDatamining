@@ -1,0 +1,213 @@
+import pandas as pd
+import joblib
+
+# Load the new data
+new_data = pd.read_csv('scaled_data.csv')
+
+# Prepare the new data by selecting the same features you used for training
+X_new = new_data[['Fwd IAT Total', 'Fwd IAT Max', 'Flow Duration', 'Fwd IAT Std', 'Fwd Packet Length Max',
+                  'Fwd Packet Length Std', 'Flow IAT Max', 'Bwd IAT Total', 'Bwd IAT Max']]
+
+# Load the saved Random Forest model
+clf = joblib.load('random_forest_model.pkl')
+
+# Make predictions on the new data
+predictions = clf.predict(X_new)
+
+# Map the numerical predictions to "Trojan" and "Benign"
+class_mapping = {0: 'Benign', 1: 'Trojan'}
+predicted_classes = [class_mapping[p] for p in predictions]
+
+# Create a DataFrame with the predicted class labels
+results_df = pd.DataFrame({'Class': predicted_classes})
+
+# Save the predictions to a CSV file with a "Class" column
+results_df.to_csv('competition_predictions.csv', index=False)
+
+# Create a separate explanation file for your chosen model
+explanation = "I chose to employ the Random Forest model for this project due to its notable advantages in predictive modeling and classification tasks .Throughout the model selection process for my first train_data.csv, Random Forest consistently showcased exceptional performance, particularly in terms of precision and recall metrics compared to the other two models I had.  One of its standout features is its ability to handle intricate relationships within the data, which ensures a robust response to complex patterns without having issues with overfitting. Additionally, it offers valuable insights into feature importance, aiding in the interpretation of results.  I did the preprocessing steps from my first project identical to the new test_data.csv. Given the project's primary goal of accurately distinguishing between 'Trojan' and 'Benign' classes, the Random Forest model emerged as the most fitting choice, aligning seamlessly with our objectives and delivering a commendable ROC AUC score of 0.70. This was the main reason why this model was used. "
+
+with open('model_explanation.txt', 'w') as explanation_file:
+    explanation_file.write(explanation)
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_curve, roc_auc_score
+import matplotlib.pyplot as plt
+
+# Load your balanced dataset (replace 'balanced_subset2.csv' with your actual data file)
+data = pd.read_csv('balanced_subset2.csv')
+
+# Shuffle the dataset to remove bias by order
+data = data.sample(frac=1, random_state=42).reset_index(drop=True)
+
+# Data Preprocessing
+# Handle missing values, convert non-numeric data, and split into training and testing sets
+data.dropna()  # Optional: Handle missing values
+data = pd.get_dummies(data, columns=['Flow ID', 'Source IP', 'Destination IP'])
+
+# Define the same numerical features as used in the Random Forest model
+X = data[['Fwd IAT Total', 'Fwd IAT Max', 'Flow Duration', 'Fwd IAT Std', 'Fwd Packet Length Max',
+          'Fwd Packet Length Std', 'Flow IAT Max', 'Bwd IAT Total', 'Bwd IAT Max']]
+y = data['Class_Trojan']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Create a KNN classifier with 'k' neighbors
+knn = KNeighborsClassifier(n_neighbors=5)  # You can change 'n_neighbors' to your chosen value of k
+
+# Train the KNN classifier on the training data
+knn.fit(X_train, y_train)
+
+# Make predictions on the test data
+y_pred = knn.predict(X_test)
+
+# Calculate various metrics
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred)
+recall = recall_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred)
+
+# Calculate ROC curve and AUC
+y_prob = knn.predict_proba(X_test)[:, 1]
+fpr, tpr, thresholds = roc_curve(y_test, y_prob)
+roc_auc = roc_auc_score(y_test, y_prob)
+
+# Print the metrics
+print("Accuracy:", accuracy)
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
+print("ROC AUC:", roc_auc)
+
+# Plot ROC curve
+plt.figure()
+plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic')
+plt.legend(loc='lower right')
+plt.show()
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_curve, auc
+import matplotlib.pyplot as plt
+import joblib 
+
+# Load the dataset
+data = pd.read_csv('balanced_subset2.csv')
+
+# Define the features (X) and the target variable (y)
+X = data[['Fwd IAT Total', 'Fwd IAT Max',
+         'Flow Duration', 'Fwd IAT Std', 'Fwd Packet Length Max',
+        'Fwd Packet Length Std', 'Flow IAT Max', 'Bwd IAT Total',
+       'Bwd IAT Max']]
+y = data['Class_Trojan']
+
+
+# Split the data into training, validation, and test sets with shuffling
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.3, random_state=42, shuffle=True)
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42, shuffle=True)
+
+# Initialize the Random Forest classifier
+clf = RandomForestClassifier()
+
+# Train the model on the training set
+clf.fit(X_train, y_train)
+
+joblib.dump(clf, 'random_forest_model.pkl')
+
+# Evaluate the model on the validation set
+y_val_pred = clf.predict(X_val)
+
+# Calculate evaluation metrics
+accuracy = accuracy_score(y_val, y_val_pred)
+precision = precision_score(y_val, y_val_pred)
+recall = recall_score(y_val, y_val_pred)
+f1 = f1_score(y_val, y_val_pred)
+
+# Generate ROC curve
+y_scores = clf.predict_proba(X_val)[:, 1]
+fpr, tpr, thresholds = roc_curve(y_val, y_scores)
+roc_auc = auc(fpr, tpr)
+
+print(f'Accuracy: {accuracy:.4f}')
+print(f'Precision: {precision:.4f}')
+print(f'Recall: {recall:.4f}')
+print(f'F1 Score: {f1:.4f}')
+print(f'ROC AUC: {roc_auc:.4f}')
+# Plot ROC curve
+plt.figure()
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic')
+plt.legend(loc='lower right')
+plt.show()
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_curve, auc
+import matplotlib.pyplot as plt
+
+# Load the dataset
+data = pd.read_csv('balanced_subset2.csv')
+
+# Define the features (X) and the target variable (y)
+X = data[['Fwd IAT Total', 'Fwd IAT Max',
+         'Flow Duration', 'Fwd IAT Std', 'Fwd Packet Length Max',
+         'Fwd Packet Length Std', 'Flow IAT Max', 'Bwd IAT Total',
+         'Bwd IAT Max']]
+y = data['Class_Trojan']
+
+# Split the data into training, validation, and test sets with shuffling
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.3, random_state=42, shuffle=True)
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42, shuffle=True)
+
+# Initialize the Support Vector Machine (SVM) classifier
+clf = SVC(kernel='rbf', probability=True)  # You can choose different kernels like 'linear', 'poly', or 'rbf'.
+#clf = SVC(kernel='poly', degree=3, probability=True)
+
+# Train the model on the training set
+clf.fit(X_train, y_train)
+
+# Evaluate the model on the validation set
+y_val_pred = clf.predict(X_val)
+
+# Calculate evaluation metrics
+accuracy = accuracy_score(y_val, y_val_pred)
+precision = precision_score(y_val, y_val_pred)
+recall = recall_score(y_val, y_val_pred)
+f1 = f1_score(y_val, y_val_pred)
+
+# Generate ROC curve
+y_scores = clf.predict_proba(X_val)[:, 1]  # For SVM, we need to set probability=True for this line to work
+fpr, tpr, thresholds = roc_curve(y_val, y_scores)
+roc_auc = auc(fpr, tpr)
+
+print(f'Accuracy: {accuracy:.4f}')
+print(f'Precision: {precision:.4f}')
+print(f'Recall: {recall:.4f}')
+print(f'F1 Score: {f1:.4f}')
+print(f'ROC AUC: {roc_auc:.4f}')
+
+# Plot ROC curve
+plt.figure()
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic')
+plt.legend(loc='lower right')
+plt.show()
